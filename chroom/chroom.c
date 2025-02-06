@@ -66,10 +66,18 @@ void* ouvir_chatters(void* ptr){
 
 
 void fechar_sala(Chroom* sala){
-	close(sala->fd);
-	for(int i = 0; i < sala->capacidade; i++){
-		close(sala->conexoes[i].fd);
+	if(sala){
+		if(sala->fd >= 0){
+			close(sala->fd);
+		}
+		if(sala->conexoes){
+			for(int i = 0; i < sala->capacidade; i++){
+				if(sala->conexoes[i].fd >= 0){
+					close(sala->conexoes[i].fd);
+				}
+			}
+			free(sala->conexoes);
+		}
+		free(sala);
 	}
-	free(sala->conexoes);
-	free(sala);
 }

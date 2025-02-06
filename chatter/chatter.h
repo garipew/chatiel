@@ -11,4 +11,5 @@ typedef struct chatter{
 Chatter* conectar_sala(char*, char*);
 void* enviar_mensagem(void*);
 void* ouvir_sala(void*);
+void apagar_chatter(Chatter*);
 #endif
