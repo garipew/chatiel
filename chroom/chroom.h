@@ -5,7 +5,9 @@
 
 typedef struct chroom{
 	int fd;
-	struct pollfd conexoes[10];
+	int capacidade;
+	int atual;
+	struct pollfd* conexoes;
 	char msg_buff[204];
 } Chroom;
 
