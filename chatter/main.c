@@ -6,21 +6,19 @@
 #include <stdlib.h>
 
 
-Chatter* chatter = NULL;
-
 void sigint_handler(int signum){
-	apagar_chatter(chatter);
-	exit(0);
+	exit_flag = 1;
 }
 
 
 int main(int argc, char* argv[]){
+	signal(SIGINT, sigint_handler);	
 		
 	if(argc < 3){
 		printf("missing arguments.\n");
 		return 1;
 	}
-	chatter = conectar_sala(argv[1], argv[2]);
+	Chatter* chatter = conectar_sala(argv[1], argv[2]);
 	printf("%s conectado\n", chatter->nome);
 
 	pthread_t enviar, ouvir;

@@ -5,6 +5,10 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <fcntl.h>
+
+
+int exit_flag = 0;
 
 
 Chatter* criar_chatter(char* nome){
@@ -24,6 +28,7 @@ Chatter* conectar_sala(char* ip, char* port){
 	}
 	Chatter* chatter = criar_chatter(nome);
 	chatter->fd = encontrar_conexao(ip, port);
+	fcntl(chatter->fd, F_SETFL, O_NONBLOCK);
 
 	if(chatter->fd == -1){
 		return NULL;
@@ -36,7 +41,7 @@ Chatter* conectar_sala(char* ip, char* port){
 void* enviar_mensagem(void* ptr){
 	Chatter* chatter = (Chatter*)ptr;
 	char msg[210];
-	while(1){
+	while(!exit_flag){
 		if(chatter->fd == -1){
 			break;
 		}
@@ -55,11 +60,13 @@ void* enviar_mensagem(void* ptr){
 
 void* ouvir_sala(void* ptr){
 	Chatter* chatter = (Chatter*)ptr;
-	while(1){
-		if(recv(chatter->fd, (char*)chatter->msg_buff, sizeof(chatter->msg_buff), 0)){
+	int bytes;
+	while(!exit_flag){
+		bytes = recv(chatter->fd, (char*)chatter->msg_buff, sizeof(chatter->msg_buff), 0);
+		if(bytes > 0){
 			printf("%s", chatter->msg_buff);	
 			memset(chatter->msg_buff, 0, sizeof(chatter->msg_buff));
-		} else {
+		} else if(bytes == 0) {
 			printf("Server said: See you space cowboy!\n");
 			close(chatter->fd);
 			chatter->fd = -1;

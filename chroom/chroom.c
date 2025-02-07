@@ -7,6 +7,9 @@
 #include <string.h>
 
 
+int exit_flag = 0;
+
+
 Chroom* abrir_sala(char* port){
 	Chroom* sala = malloc(sizeof(*sala));
 
@@ -22,21 +25,28 @@ Chroom* abrir_sala(char* port){
 
 void* aceitar_chatter(void* ptr){
 	Chroom* sala = (Chroom*)ptr;
-	while(1){
+	struct pollfd listener[1];	
+	listener[0].fd = sala->fd;
+	listener[0].events = POLLIN;
+
+	while(!exit_flag){
 		if(sala->atual == sala->capacidade){
 			sala->capacidade *= 2;
 			sala->conexoes = realloc(sala->conexoes, sizeof(*(sala->conexoes)) * sala->capacidade);
 			printf("Expanding server size to %d.\n", sala->capacidade);
 		}	
-		sala->conexoes[sala->atual].fd = aceitar_conexao(sala->fd);
-		sala->conexoes[sala->atual].events = POLLIN;
-		sala->atual++;
+		if(poll(listener, 1, 2500)){
+			sala->conexoes[sala->atual].fd = aceitar_conexao(sala->fd);
+			sala->conexoes[sala->atual].events = POLLIN;
+			sala->atual++;
+		}
 	}
+	printf("Exiting accept thread.\n");
 }
 
 
 void ecoar_mensagem(Chroom* sala, int origem){
-	for(int i = 0; i < sala->capacidade; i++){
+	for(int i = 0; i < sala->atual; i++){
 		if(sala->conexoes[i].fd != origem){
 			send(sala->conexoes[i].fd, sala->msg_buff, sizeof(sala->msg_buff), 0);
 		}
@@ -46,9 +56,9 @@ void ecoar_mensagem(Chroom* sala, int origem){
 
 void* ouvir_chatters(void* ptr){
 	Chroom* sala = (Chroom*)ptr;
-	while(1){	
-		poll(sala->conexoes, sala->capacidade, 2500);
-		for(int i = 0; i < sala->capacidade; i++){
+	while(!exit_flag){	
+		poll(sala->conexoes, sala->atual, 2500);
+		for(int i = 0; i < sala->atual; i++){
 			if(!(sala->conexoes[i].revents & POLLIN)){
 				continue;
 			}
@@ -62,6 +72,7 @@ void* ouvir_chatters(void* ptr){
 			}
 		}
 	}
+	printf("Exiting listener thread.\n");
 }
 
 
@@ -71,7 +82,7 @@ void fechar_sala(Chroom* sala){
 			close(sala->fd);
 		}
 		if(sala->conexoes){
-			for(int i = 0; i < sala->capacidade; i++){
+			for(int i = 0; i < sala->atual; i++){
 				if(sala->conexoes[i].fd >= 0){
 					close(sala->conexoes[i].fd);
 				}

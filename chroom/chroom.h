@@ -11,6 +11,8 @@ typedef struct chroom{
 	char msg_buff[204];
 } Chroom;
 
+extern int exit_flag;
+
 Chroom* abrir_sala(char*);
 void* aceitar_chatter(void*);
 void* ouvir_chatters(void*);

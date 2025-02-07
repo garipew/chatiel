@@ -6,20 +6,19 @@
 #include <stdlib.h>
 
 
-Chroom* sala = NULL;
-
 void sigint_handler(int signum){
-	fechar_sala(sala);
-	exit(0);
+	exit_flag = 1;
 }
 
+
 int main(int argc, char* argv[]){
+	signal(SIGINT, sigint_handler);	
 		
 	if(argc < 2){
 		printf("missing arguments.\n");
 		return 1;
 	}
-	sala = abrir_sala(argv[1]);
+	Chroom* sala = abrir_sala(argv[1]);
 	pthread_t aceitar, ouvir;
 
 	pthread_create(&aceitar, NULL, aceitar_chatter, sala);

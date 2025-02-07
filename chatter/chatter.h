@@ -8,6 +8,8 @@ typedef struct chatter{
 	char nome[6];
 } Chatter;
 
+extern int exit_flag;
+
 Chatter* conectar_sala(char*, char*);
 void* enviar_mensagem(void*);
 void* ouvir_sala(void*);
