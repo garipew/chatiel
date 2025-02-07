@@ -86,7 +86,10 @@ void* ouvir_chatters(void* ptr){
 	char quitter[4];
 	int bytes;
 	while(!exit_flag){	
-		poll(sala->conexoes, sala->atual, 0);
+		if(sala->atual == 0){
+			continue;
+		}
+		poll(sala->conexoes, sala->atual, 1000);
 		for(int i = 0; i < sala->atual; i++){
 			if(!(sala->conexoes[i].revents & POLLIN)){
 				continue;
