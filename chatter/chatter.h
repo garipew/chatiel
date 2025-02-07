@@ -5,7 +5,6 @@
 typedef struct chatter{
 	int fd;
 	char msg_buff[200];
-	char nome[6];
 } Chatter;
 
 extern int exit_flag;

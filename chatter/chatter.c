@@ -11,28 +11,19 @@
 int exit_flag = 0;
 
 
-Chatter* criar_chatter(char* nome){
+Chatter* criar_chatter(){
 	Chatter* chatter = malloc(sizeof(*chatter));
-	strncpy(chatter->nome, nome, sizeof(chatter->nome));
-	chatter->nome[4] = '\0';
-
 	return chatter;
 }
 
 Chatter* conectar_sala(char* ip, char* port){
-	char nome[6];
-	printf("Digite um nome de ate 4 letras para te identificar: ");
-	fgets(nome, sizeof(nome), stdin);
-	if(!strchr(nome, '\n')){
-		while(fgetc(stdin)!='\n');
-	}
-	Chatter* chatter = criar_chatter(nome);
+	Chatter* chatter = criar_chatter();
 	chatter->fd = encontrar_conexao(ip, port);
-	fcntl(chatter->fd, F_SETFL, O_NONBLOCK);
 
 	if(chatter->fd == -1){
 		return NULL;
 	}
+	fcntl(chatter->fd, F_SETFL, O_NONBLOCK);
 
 	return chatter;
 }
@@ -40,20 +31,13 @@ Chatter* conectar_sala(char* ip, char* port){
 
 void* enviar_mensagem(void* ptr){
 	Chatter* chatter = (Chatter*)ptr;
-	char msg[210];
 	while(!exit_flag){
 		if(chatter->fd == -1){
 			break;
 		}
-		memset(msg, 0, sizeof(msg));
-		strncpy(msg, chatter->nome, 4);
-		strcat(msg, ": ");
-		fgets(chatter->msg_buff, sizeof(chatter->msg_buff), stdin);
-		if(!strchr(chatter->msg_buff, '\n')){
-			while(fgetc(stdin)!='\n');
+		while(fgets(chatter->msg_buff, sizeof(chatter->msg_buff), stdin)){ 
+			send(chatter->fd, chatter->msg_buff, strnlen(chatter->msg_buff, sizeof(chatter->msg_buff)), 0);		
 		}
-		strncat(msg, chatter->msg_buff, sizeof(chatter->msg_buff));
-		send(chatter->fd, msg, sizeof(msg), 0);		
 	}
 }
 

@@ -4,6 +4,8 @@
 #include <pthread.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 
 void sigint_handler(int signum){
@@ -18,8 +20,9 @@ int main(int argc, char* argv[]){
 		printf("missing arguments.\n");
 		return 1;
 	}
+	fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
 	Chatter* chatter = conectar_sala(argv[1], argv[2]);
-	printf("%s conectado\n", chatter->nome);
+	printf("Conectado ao servidor\n");
 
 	pthread_t enviar, ouvir;
 	pthread_create(&enviar, NULL, enviar_mensagem, chatter);
