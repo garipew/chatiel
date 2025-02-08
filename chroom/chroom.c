@@ -53,8 +53,11 @@ void registrar_nome(Chroom* sala){
 	int bytes = recv(sala->conexoes[sala->atual].fd, nome, sizeof(nome), 0);
 	nome[4] = '\0';
 	if(bytes > 0){
-		strncpy(sala->nomes+(sala->atual*4), nome, 4);
+		strncpy(sala->nomes+(sala->atual*4), nome, strlen(nome));
 		printf("%s entrou.\n", nome);
+		strncpy(sala->msg_buff, nome, strlen(nome));
+		strcat(sala->msg_buff, " entrou.\n"); 
+		ecoar_mensagem(sala, -1);
 	} else if(bytes == 0){
 		printf("Desconhecido desconectou.\n");
 	}
@@ -93,7 +96,6 @@ void* aceitar_chatter(void* ptr){
 			printf("Servidor expandindo para %d.\n", sala->capacidade);
 		}	
 		if((sala->atual < sala->capacidade) && poll(listener, 1, 2500)){
-			printf("Nova conexão solicitada...\n");
 			sala->conexoes[sala->atual].fd = aceitar_conexao(sala->fd);
 			sala->conexoes[sala->atual].events = POLLIN;
 			registrar_nome(sala);
@@ -104,16 +106,23 @@ void* aceitar_chatter(void* ptr){
 }
 
 
+/* void ecoar_mensagem(Chroom*, int)
+ * Envia mensagem no msg_buff de Chroom* para todos os clients,
+ * com excecao do client na posicao passada. 
+ * Caso origem nao exista, envia para todos.
+*/
 void ecoar_mensagem(Chroom* sala, int origem){
 	char msg[215] = { 0 };
-	strncpy(msg, sala->nomes + (origem*4), 4);
-	strcat(msg, ": ");
+	if(origem >= 0 && origem < sala->atual){
+		strncpy(msg, sala->nomes + (origem*4), 4);
+		strcat(msg, ": ");
+	}
 	strncat(msg, sala->msg_buff, sizeof(sala->msg_buff));
 	if(sala->msg_buff[strlen(sala->msg_buff)-1] != '\n'){
 		strcat(msg, "\n");
 	}
 	for(int i = 0; i < sala->atual; i++){
-		if(sala->conexoes[i].fd != sala->conexoes[origem].fd){
+		if(origem < 0 || origem >= sala->atual || sala->conexoes[i].fd != sala->conexoes[origem].fd){
 			send(sala->conexoes[i].fd, msg, sizeof(msg), 0);
 		}
 	}
@@ -144,6 +153,9 @@ void* ouvir_chatters(void* ptr){
 				strncpy(quitter, sala->nomes + (i*4), sizeof(quitter));
 				printf("%s saiu.\n", quitter);
 				memcpy(sala->nomes+(i*4), sala->nomes+(sala->atual*4), 4);
+				strncpy(sala->msg_buff, quitter, sizeof(quitter));
+				strcat(sala->msg_buff, " saiu.\n");
+				ecoar_mensagem(sala, -1);
 			}
 		}
 	}
@@ -153,6 +165,8 @@ void* ouvir_chatters(void* ptr){
 
 void fechar_sala(Chroom* sala){
 	if(sala){
+		strncpy(sala->msg_buff, "See you space cowboy...\n", 25);
+		ecoar_mensagem(sala, -1);
 		if(sala->fd >= 0){
 			close(sala->fd);
 		}

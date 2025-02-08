@@ -18,5 +18,6 @@ extern int exit_flag;
 Chroom* abrir_sala(char*);
 void* aceitar_chatter(void*);
 void* ouvir_chatters(void*);
+void ecoar_mensagem(Chroom*, int);
 void fechar_sala(Chroom*);
 #endif

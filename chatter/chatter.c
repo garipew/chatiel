@@ -56,7 +56,7 @@ void* ouvir_sala(void* ptr){
 			printf("%s", chatter->msg_buff);	
 			memset(chatter->msg_buff, 0, sizeof(chatter->msg_buff));
 		} else if(bytes == 0) {
-			printf("Server said: See you space cowboy!\n");
+			printf("Connection closed by foreign host.\n");
 			close(chatter->fd);
 			chatter->fd = -1;
 			break;
