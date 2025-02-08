@@ -7,20 +7,41 @@
 #include <string.h>
 
 
+#define xmalloc(...) NULL
+#define xrealloc(...) NULL
+
 int exit_flag = 0;
 
 
 Chroom* abrir_sala(char* port){
 	Chroom* sala = malloc(sizeof(*sala));
+	if(sala == NULL){
+		goto sala;
+	}
 
 	sala->fd = encontrar_conexao(NULL, port);
 	sala->capacidade = 5;
 	sala->atual = 0;
+	sala->max_size = 0;
 	sala->conexoes = malloc(sizeof(*(sala->conexoes)) * sala->capacidade);
-	sala->nomes = malloc(sizeof(*(sala->nomes)) * sala->capacidade * 4);
-	memset(sala->nomes, 0, sizeof(sala->nomes));
+	if(sala->conexoes == NULL){
+		goto conexoes;
+	}
 	memset(sala->conexoes, -1, sizeof(sala->conexoes));
+	sala->nomes = malloc(sizeof(*(sala->nomes)) * sala->capacidade * 4);
+	if(sala->nomes == NULL){
+		goto nomes;
+	}
+	memset(sala->nomes, 0, sizeof(sala->nomes));
+	goto sala;
 
+	nomes:
+	free(sala->conexoes);
+	sala->conexoes = NULL;
+	conexoes:
+	free(sala);
+	sala = NULL;
+	sala:
 	return sala;
 }
 
@@ -45,15 +66,34 @@ void* aceitar_chatter(void* ptr){
 	struct pollfd listener[1];	
 	listener[0].fd = sala->fd;
 	listener[0].events = POLLIN;
+	char *name_buff;
+	struct pollfd* con_buff;	
 
 	while(!exit_flag){
-		if(sala->atual == sala->capacidade){
+		if((sala->atual == sala->capacidade) && !sala->max_size){
 			sala->capacidade *= 2;
-			sala->conexoes = realloc(sala->conexoes, sizeof(*(sala->conexoes)) * sala->capacidade);
-			sala->nomes = realloc(sala->nomes, sizeof(*(sala->nomes)) * sala->capacidade * 4);
+			con_buff = realloc(sala->conexoes, sizeof(*(sala->conexoes)) * sala->capacidade);
+			if(con_buff == NULL){
+				sala->max_size = 1;
+				sala->capacidade /= 2;
+				printf("Servidor não consegue expandir... Dx\n%d/%d\n", sala->atual, sala->capacidade);
+				continue;
+			}
+			name_buff = realloc(sala->nomes, sizeof(*(sala->nomes)) * sala->capacidade * 4);
+			if(name_buff == NULL){
+				free(con_buff);
+				sala->max_size = 1;
+				sala->capacidade /= 2;
+				printf("Servidor não consegue expandir... Dx\n%d/%d\n", sala->atual, sala->capacidade);
+				continue;
+			}
+			
+			sala->nomes = name_buff;
+			sala->conexoes = con_buff;
 			printf("Servidor expandindo para %d.\n", sala->capacidade);
 		}	
-		if(poll(listener, 1, 2500)){
+		if((sala->atual < sala->capacidade) && poll(listener, 1, 2500)){
+			printf("Nova conexão solicitada...\n");
 			sala->conexoes[sala->atual].fd = aceitar_conexao(sala->fd);
 			sala->conexoes[sala->atual].events = POLLIN;
 			registrar_nome(sala);

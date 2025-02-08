@@ -10,6 +10,7 @@ typedef struct chroom{
 	char* nomes;
 	struct pollfd* conexoes;
 	char msg_buff[204];
+	int max_size;
 } Chroom;
 
 extern int exit_flag;

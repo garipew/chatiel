@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#define xmalloc(...) NULL
 
 int exit_flag = 0;
 
@@ -18,9 +19,13 @@ Chatter* criar_chatter(){
 
 Chatter* conectar_sala(char* ip, char* port){
 	Chatter* chatter = criar_chatter();
+	if(chatter == NULL){
+		return chatter;
+	}
 	chatter->fd = encontrar_conexao(ip, port);
 
 	if(chatter->fd == -1){
+		free(chatter);
 		return NULL;
 	}
 	fcntl(chatter->fd, F_SETFL, O_NONBLOCK);

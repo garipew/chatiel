@@ -19,6 +19,10 @@ int main(int argc, char* argv[]){
 		return 1;
 	}
 	Chroom* sala = abrir_sala(argv[1]);
+	if(sala == NULL){
+		printf("Incapaz de abrir sala.\nEncerrando.\n");
+		return 1;
+	}
 	pthread_t aceitar, ouvir;
 
 	pthread_create(&aceitar, NULL, aceitar_chatter, sala);

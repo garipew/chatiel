@@ -22,6 +22,10 @@ int main(int argc, char* argv[]){
 	}
 	fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK);
 	Chatter* chatter = conectar_sala(argv[1], argv[2]);
+	if(chatter == NULL){
+		printf("Incapaz de criar chatter.\nEncerrando.\n");
+		return 1;
+	}
 	printf("Conectado ao servidor\n");
 
 	pthread_t enviar, ouvir;
