@@ -60,6 +60,8 @@ void registrar_nome(Chroom* sala){
 		ecoar_mensagem(sala, -1);
 	} else if(bytes == 0){
 		printf("Desconhecido desconectou.\n");
+		close(sala->conexoes[sala->atual].fd);
+		sala->atual--;
 	}
 }
 
