@@ -50,12 +50,14 @@ int conectar_primeiro(struct addrinfo *servinfo){
 int bind_primeiro(struct addrinfo *servinfo){
 	struct addrinfo *p;
 	int serverfd;
+	int opt = 1;
 
 	for(p = servinfo; p != NULL; p = p->ai_next){
 		serverfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
 		if(serverfd == -1){
 			continue;
 		}
+		setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
 		if(bind(serverfd, p->ai_addr, p->ai_addrlen) == -1){
 			close(serverfd);
@@ -92,6 +94,7 @@ int iniciar_servidor(int sfd){
 int encontrar_conexao(char* ip, char* port){
 	int serverfd;
 	struct addrinfo hint, *servinfo; 
+	int addr_return;
 
 	memset(&hint, 0, sizeof(hint));
 	hint.ai_family = AF_INET;
@@ -101,7 +104,9 @@ int encontrar_conexao(char* ip, char* port){
 		hint.ai_flags = AI_PASSIVE;
 	}
 
-	if(getaddrinfo(ip, port, &hint, &servinfo) != 0){
+	while((addr_return = getaddrinfo(ip, port, &hint, &servinfo)) == EAI_AGAIN){
+	}
+	if(addr_return != 0){
 		handle_error("addrinfo");
 	}
 
@@ -112,6 +117,7 @@ int encontrar_conexao(char* ip, char* port){
 			if(iniciar_servidor(serverfd)){
 				close(serverfd);
 				serverfd = -1;
+				freeaddrinfo(servinfo);
 				handle_error("listen");
 			}
 			printf("Server is running and listening on port %s\n", port);
