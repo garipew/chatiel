@@ -54,7 +54,6 @@ void registrar_nome(Chroom* sala){
 	nome[4] = '\0';
 	if(bytes > 0){
 		strncpy(sala->nomes+(sala->atual*4), nome, strlen(nome));
-		printf("%s entrou.\n", nome);
 		strncpy(sala->msg_buff, nome, strlen(nome));
 		strcat(sala->msg_buff, " entrou.\n"); 
 		ecoar_mensagem(sala, -1);
@@ -118,7 +117,9 @@ void ecoar_mensagem(Chroom* sala, int origem){
 	if(origem >= 0 && origem < sala->atual){
 		strncpy(msg, sala->nomes + (origem*4), 4);
 		strcat(msg, ": ");
-	}
+	} else{
+		printf("%s", sala->msg_buff);
+	} 
 	strncat(msg, sala->msg_buff, sizeof(sala->msg_buff));
 	if(sala->msg_buff[strlen(sala->msg_buff)-1] != '\n'){
 		strcat(msg, "\n");
@@ -132,9 +133,21 @@ void ecoar_mensagem(Chroom* sala, int origem){
 }
 
 
+void remover_chatter(Chroom* sala, int i){
+	if(sala->conexoes[i].fd >= 0){
+		close(sala->conexoes[i].fd);
+		sala->atual--;
+		memcpy(&sala->conexoes[i], &sala->conexoes[sala->atual], sizeof(*(sala->conexoes)));
+		strncpy(sala->msg_buff, sala->nomes + (i*4), 4);
+		strcat(sala->msg_buff, " saiu.\n");
+		memcpy(sala->nomes+(i*4), sala->nomes+(sala->atual*4), 4);
+		ecoar_mensagem(sala, -1);
+	}
+}
+
+
 void* ouvir_chatters(void* ptr){
 	Chroom* sala = (Chroom*)ptr;
-	char quitter[4];
 	int bytes;
 	while(!exit_flag){	
 		if(sala->atual == 0){
@@ -149,15 +162,7 @@ void* ouvir_chatters(void* ptr){
 			if(bytes > 0){
 				ecoar_mensagem(sala, i);
 			} else if(bytes == 0){
-				close(sala->conexoes[i].fd);
-				sala->atual--;
-				memcpy(&sala->conexoes[i], &sala->conexoes[sala->atual], sizeof(*(sala->conexoes)));
-				strncpy(quitter, sala->nomes + (i*4), sizeof(quitter));
-				printf("%s saiu.\n", quitter);
-				memcpy(sala->nomes+(i*4), sala->nomes+(sala->atual*4), 4);
-				strncpy(sala->msg_buff, quitter, sizeof(quitter));
-				strcat(sala->msg_buff, " saiu.\n");
-				ecoar_mensagem(sala, -1);
+				remover_chatter(sala, i);
 			}
 		}
 	}
@@ -173,10 +178,8 @@ void fechar_sala(Chroom* sala){
 			close(sala->fd);
 		}
 		if(sala->conexoes){
-			for(int i = 0; i < sala->atual; i++){
-				if(sala->conexoes[i].fd >= 0){
-					close(sala->conexoes[i].fd);
-				}
+			while(sala->atual > 0){
+				remover_chatter(sala, 0);
 			}
 			free(sala->conexoes);
 		}
