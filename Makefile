@@ -1,17 +1,17 @@
-chat: chroom.o conexao.o chroom/main.c
-	gcc chroom/main.c conexao.o chroom.o -o chat -lpthread
+chat: chroom.o conexao.o server/main.c
+	gcc server/main.c conexao.o chroom.o -o chat -lpthread
 
-client: chatter.o conexao.o chatter/main.c
-	gcc chatter/main.c chatter.o conexao.o -o client -lpthread
+chatter: chatter.o conexao.o client/main.c
+	gcc client/main.c chatter.o conexao.o -o chatter -lpthread
 
-chroom.o: chroom/chroom.c chroom/chroom.h
-	gcc -c chroom/chroom.c
+chroom.o: server/chroom.c server/chroom.h
+	gcc -c server/chroom.c
 
-chatter.o: chatter/chatter.c chatter/chatter.h
-	gcc -c chatter/chatter.c
+chatter.o: client/chatter.c client/chatter.h
+	gcc -c client/chatter.c
 
 conexao.o: conexao.c conexao.h
 	gcc -c conexao.c
 
 clean:
-	rm -rf *.o chat client
+	rm -rf *.o chat chatter
