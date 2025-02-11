@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <arpa/inet.h>
 
 #define xmalloc(...) NULL
 #define xrealloc(...) NULL
@@ -23,6 +23,11 @@ Chroom* abrir_sala(char* port){
 	sala->capacidade = 5;
 	sala->atual = 0;
 	sala->max_size = 0;
+	sala->msg_size = 100;
+	sala->msg_buff = malloc(sizeof(*(sala->msg_buff)) * sala->msg_size);
+	if(sala->msg_buff == NULL){
+		goto msg;
+	}
 	sala->conexoes = malloc(sizeof(*(sala->conexoes)) * sala->capacidade);
 	if(sala->conexoes == NULL){
 		goto conexoes;
@@ -39,6 +44,9 @@ Chroom* abrir_sala(char* port){
 	free(sala->conexoes);
 	sala->conexoes = NULL;
 	conexoes:
+	free(sala->msg_buff);
+	sala->msg_buff = NULL;
+	msg:
 	free(sala);
 	sala = NULL;
 	sala:
@@ -46,21 +54,22 @@ Chroom* abrir_sala(char* port){
 }
 
 
+void enviar_mensagem(int fd, char* str, size_t str_len){
+	int size = htonl(strnlen(str, str_len));
+	send(fd, &size, sizeof(size), 0);
+	send(fd, str, strnlen(str, str_len), 0);	
+}
+
+
 void registrar_nome(Chroom* sala){
 	char nome[] = "Como gostaria de ser conhecido? Digite um ID de ate 4 letras: ";
-	send(sala->conexoes[sala->atual].fd, nome, sizeof(nome), 0);
-	memset(nome, 0, sizeof(nome));
-	int bytes = recv(sala->conexoes[sala->atual].fd, nome, sizeof(nome), 0);
-	nome[4] = '\0';
+	enviar_mensagem(sala->conexoes[sala->atual].fd, nome, sizeof(nome));
+	int bytes = ouvir_mensagem(sala, sala->atual);
 	if(bytes > 0){
-		strncpy(sala->nomes+(sala->atual*4), nome, strlen(nome));
-		strncpy(sala->msg_buff, nome, strlen(nome));
+		strncpy(sala->nomes+(sala->atual*4), sala->msg_buff, 4);
+		memset(sala->msg_buff + 4, 0, sala->msg_size - 4);
 		strcat(sala->msg_buff, " entrou.\n"); 
-		ecoar_mensagem(sala, -1);
-	} else if(bytes == 0){
-		printf("Desconhecido desconectou.\n");
-		close(sala->conexoes[sala->atual].fd);
-		sala->atual--;
+		ecoar_mensagem(sala, strnlen(sala->msg_buff, sala->msg_size), -1);
 	}
 }
 
@@ -107,29 +116,39 @@ void* aceitar_chatter(void* ptr){
 }
 
 
-/* void ecoar_mensagem(Chroom*, int)
- * Envia mensagem no msg_buff de Chroom* para todos os clients,
- * com excecao do client na posicao passada. 
+/* void ecoar_mensagem(Chroom* sala, int bytes, int origem)
+ * Envia bytes da string em msg_buff de sala para todos os clients,
+ * com excecao do client de origem. 
  * Caso origem nao exista, envia para todos.
 */
-void ecoar_mensagem(Chroom* sala, int origem){
-	char msg[215] = { 0 };
+void ecoar_mensagem(Chroom* sala, int bytes, int origem){
+	int msg_size = bytes + 7;
+	char* msg = malloc(sizeof(*msg) * (msg_size));
+	int total_bytes;
+	if(msg == NULL){
+		printf("-_-\n");
+		return;
+	}
+	memset(msg, 0, msg_size);
 	if(origem >= 0 && origem < sala->atual){
 		strncpy(msg, sala->nomes + (origem*4), 4);
 		strcat(msg, ": ");
 	} else{
 		printf("%s", sala->msg_buff);
 	} 
-	strncat(msg, sala->msg_buff, sizeof(sala->msg_buff));
-	if(sala->msg_buff[strlen(sala->msg_buff)-1] != '\n'){
-		strcat(msg, "\n");
-	}
+	strncat(msg, sala->msg_buff, sala->msg_size);
+	total_bytes = strnlen(msg, msg_size);
+	total_bytes = htonl(total_bytes);
 	for(int i = 0; i < sala->atual; i++){
 		if(origem < 0 || origem >= sala->atual || sala->conexoes[i].fd != sala->conexoes[origem].fd){
-			send(sala->conexoes[i].fd, msg, sizeof(msg), 0);
+			send(sala->conexoes[i].fd, &total_bytes, sizeof(total_bytes), 0);
+			send(sala->conexoes[i].fd, msg, strnlen(msg, msg_size), 0);
 		}
 	}
-	memset(sala->msg_buff, 0, sizeof(sala->msg_buff));
+	memset(sala->msg_buff, 0, sala->msg_size);
+	if(msg){
+		free(msg);
+	}
 }
 
 
@@ -141,14 +160,62 @@ void remover_chatter(Chroom* sala, int i){
 		strncpy(sala->msg_buff, sala->nomes + (i*4), 4);
 		strcat(sala->msg_buff, " saiu.\n");
 		memcpy(sala->nomes+(i*4), sala->nomes+(sala->atual*4), 4);
-		ecoar_mensagem(sala, -1);
+		ecoar_mensagem(sala, strnlen(sala->msg_buff, sala->msg_size), -1);
 	}
+}
+
+
+void estender_buffer(Chroom* sala, size_t size){
+	char* extended;
+	if(sala->msg_size < size){
+		extended = realloc(sala->msg_buff, size);
+		if(extended == NULL){
+			printf("NOOOOOO.\n");
+			return;
+		}
+		sala->msg_buff = extended;
+		sala->msg_size = size;
+	}
+}
+
+int ouvir_mensagem(Chroom* sala, int chatter){
+	int read_bytes = 0;
+	int size;
+	int chunk_size = 0;
+	char msg_chunk[200];
+
+	chunk_size = recv(sala->conexoes[chatter].fd, &size, sizeof(size), 0);
+	if(chunk_size == 0){
+		/* Disconnect */
+		remover_chatter(sala, chatter);
+		return read_bytes;
+	} else if(chunk_size < 0){
+		/* Error */
+		return read_bytes;
+	}
+	size = ntohl(size);
+	estender_buffer(sala, size);	
+	memset(sala->msg_buff, 0, sala->msg_size);
+	while(read_bytes < size){
+		chunk_size = recv(sala->conexoes[chatter].fd, msg_chunk, sizeof(msg_chunk), 0);
+		if(chunk_size == 0){
+			/* Disconnect */
+			remover_chatter(sala, chatter);
+			break;
+		} else if(chunk_size < 0){
+			/* Error */
+			break;
+		}
+		memcpy((sala->msg_buff + read_bytes), msg_chunk, chunk_size);	
+		read_bytes += chunk_size;
+	}
+	return read_bytes;
 }
 
 
 void* ouvir_chatters(void* ptr){
 	Chroom* sala = (Chroom*)ptr;
-	int bytes;
+	int bytes = 0;
 	while(!exit_flag){	
 		if(sala->atual == 0){
 			continue;
@@ -158,12 +225,10 @@ void* ouvir_chatters(void* ptr){
 			if(!(sala->conexoes[i].revents & POLLIN)){
 				continue;
 			}
-			bytes = recv(sala->conexoes[i].fd, (char*)sala->msg_buff, sizeof(sala->msg_buff), 0); 
+			bytes = ouvir_mensagem(sala, i); 
 			if(bytes > 0){
-				ecoar_mensagem(sala, i);
-			} else if(bytes == 0){
-				remover_chatter(sala, i);
-			}
+				ecoar_mensagem(sala, bytes, i);
+			} 
 		}
 	}
 	printf("Exiting listener thread.\n");
@@ -173,7 +238,7 @@ void* ouvir_chatters(void* ptr){
 void fechar_sala(Chroom* sala){
 	if(sala){
 		strncpy(sala->msg_buff, "See you space cowboy...\n", 25);
-		ecoar_mensagem(sala, -1);
+		ecoar_mensagem(sala, strnlen(sala->msg_buff, sala->msg_size), -1);
 		if(sala->fd >= 0){
 			close(sala->fd);
 		}
@@ -185,6 +250,9 @@ void fechar_sala(Chroom* sala){
 		}
 		if(sala->nomes){
 			free(sala->nomes);
+		}
+		if(sala->msg_buff){
+			free(sala->msg_buff);
 		}
 		free(sala);
 	}
